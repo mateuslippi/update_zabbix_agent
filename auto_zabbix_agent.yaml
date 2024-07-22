@@ -1,0 +1,70 @@
+                                                                                                                                                                                                                                                                        68,1          All
+- hosts: tailandia
+  become: yes
+  tasks:
+
+    - name: Obter informações do SO
+      ansible.builtin.setup:
+        gather_subset:
+          - "distribution"
+
+    - name: Mostrar informações sobre o SO detectado
+      ansible.builtin.debug:
+        msg: "Distribuição detectada: {{ ansible_facts['distribution'] }}"
+
+    - name: Verificar se o sistema é RHEL like
+      ansible.builtin.fail:
+        msg: "Este playbook só pode ser executado em sistemas RHEL like (RHEL, CentOS, Fedora, etc.)."
+      when: ansible_facts['distribution'] not in ['RedHat', 'CentOS', 'Fedora', 'Rocky']
+
+    - name: Capturar a versão do RHEL
+      command: rpm -E %{rhel}
+      register: rhel_version
+
+    - name: Definir a URL do repositório do Zabbix
+      set_fact:
+        zabbix_repo_url: "https://repo.zabbix.com/zabbix/7.0/rhel/{{ rhel_version.stdout }}/x86_64/zabbix-release-7.0-4.el{{ rhel_version.stdout }}.noarch.rpm"
+
+    - name: Adicionar a chave GPG do repositório oficial do Zabbix
+      ansible.builtin.rpm_key:
+        state: present
+        key: https://repo.zabbix.com/RPM-GPG-KEY-ZABBIX
+
+    - name: Baixar o pacote do repositório do Zabbix
+      ansible.builtin.get_url:
+        url: "{{ zabbix_repo_url }}"
+        dest: /tmp/zabbix-release.rpm
+
+    - name: Instalar o pacote RPM do repositório Zabbix
+      ansible.builtin.yum:
+        name: /tmp/zabbix-release.rpm
+        state: present
+
+    - name: Limpar o cache do Yum
+      ansible.builtin.yum:
+        name: '*'
+        state: latest
+        update_cache: yes
+
+    - name: Configurar prioridade do repositório Zabbix
+      ini_file:
+       path: /etc/yum.repos.d/zabbix.repo
+       section: zabbix
+       option: priority
+       value: '1'
+
+    - name: Remover o pacote zabbix-agent
+      ansible.builtin.yum:
+        name: zabbix-agent
+        state: absent
+
+    - name: Instalar o Zabbix Agent
+      ansible.builtin.yum:
+        name: zabbix-agent
+        state: latest
+
+    - name: Iniciar e habilitar o Zabbix Agent
+      ansible.builtin.systemd:
+        name: zabbix-agent
+        enabled: yes
+        state: started
