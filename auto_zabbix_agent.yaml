@@ -1,5 +1,4 @@
-                                                                                                                                                                                                                                                                        68,1          All
-- hosts: tailandia
+- hosts: all
   become: yes
   tasks:
 
@@ -35,10 +34,15 @@
         url: "{{ zabbix_repo_url }}"
         dest: /tmp/zabbix-release.rpm
 
+          #    - name: Instalar o pacote RPM do repositório Zabbix
+          #      ansible.builtin.yum:
+          #        name: /tmp/zabbix-release.rpm
+          #        state: latest
+
     - name: Instalar o pacote RPM do repositório Zabbix
-      ansible.builtin.yum:
-        name: /tmp/zabbix-release.rpm
-        state: present
+      ansible.builtin.shell:
+        chdir: /tmp
+        cmd: yum install -y zabbix-release.rpm
 
     - name: Limpar o cache do Yum
       ansible.builtin.yum:
